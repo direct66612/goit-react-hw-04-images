@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import { useState, useEffect } from 'react';
 import { Searchbar } from './Searchbar/Searchbar';
 import { fetchImagesBySearch } from 'API/api';
 import { ImageGallery } from './ImageGallery/ImageGallery';
@@ -6,127 +6,93 @@ import { ThreeCircles } from 'react-loader-spinner';
 import { Button } from './Button/Button';
 import { Modal } from './Modal/Modal';
 
-export class App extends Component {
-  state = {
-    images: [],
-    imageQuery: '',
-    page: 1,
-    loading: false,
-    error: false,
-    loadMore: false,
-    isShowModal: false,
-    largeImageURL: '',
-  };
-
-  handleSubmit = imageName => {
-    if (this.state.imageQuery === imageName) {
+export const App = () => {
+  const [images, setImages] = useState([]);
+  const [imageQuery, setImageQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [loadMore, setLoadMore] = useState(false);
+  const [isShowModal, setIsShowModal] = useState(false);
+  const [largeImageURL, setLargeImageURL] = useState('');
+  const handleSubmit = imageName => {
+    if (imageQuery === imageName) {
       return;
     }
-    this.setState({
-      imageQuery: imageName,
-      page: 1,
-      images: [],
-      loadMore: false,
-    });
+    setImageQuery(imageName);
+    setPage(1);
+    setImages([]);
+    setLoadMore(false);
   };
 
-  handleLoadMore = () => {
-    this.setState(prevState => {
-      return {
-        page: prevState.page + 1,
-      };
-    });
+  const handleLoadMore = () => {
+    setPage(prevPage => prevPage + 1);
   };
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!imageQuery) return;
+      setLoading(true);
 
-  async componentDidUpdate(prevProps, prevState) {
-    if (
-      this.state.page !== prevState.page ||
-      this.state.imageQuery !== prevState.imageQuery
-    ) {
-      this.setState({ loading: true });
       try {
-        const imagesData = await fetchImagesBySearch(
-          this.state.imageQuery,
-          this.state.page
-        );
-        if (imagesData.hits.length !== 0) {
-          this.setState(prevState => ({
-            images: [...prevState.images, ...imagesData.hits],
-            loadMore: this.state.page < Math.ceil(imagesData.totalHits / 12),
-          }));
-        } else if (imagesData.hits.length === 0) {
+        const imagesStorage = await fetchImagesBySearch(imageQuery, page);
+
+        if (imagesStorage.hits.length !== 0) {
+          setImages(prevImages => [...prevImages, ...imagesStorage.hits]);
+          setLoadMore(page < Math.ceil(imagesStorage.totalHits / 12));
+        } else {
           alert('No found! Please try again.');
         }
       } catch (error) {
-        this.setState({ error: true, images: [] });
+        setImages([]);
         alert('Please try reloading this page!');
       } finally {
-        this.setState({ loading: false });
+        setLoading(false);
       }
-    }
-  }
+    };
 
-  handleClick = image => {
-    this.setState({
-      isShowModal: true,
-      largeImageURL: image.largeImageURL,
-    });
+    fetchData();
+  }, [imageQuery, page]);
+
+  const handleClick = image => {
+    setIsShowModal(true);
+    setLargeImageURL(image.largeImageURL);
   };
 
-  handleModalClose = () => {
-    this.setState({
-      isShowModal: false,
-      largeImageURL: '',
-    });
+  const handleModalClose = () => {
+    setIsShowModal(false);
+    setLargeImageURL('');
   };
+  return (
+    <div className="App">
+      <Searchbar handleSubmit={handleSubmit} />
 
-  render() {
-    const {
-      images,
-      imageQuery,
-      loading,
-      loadMore,
-      isShowModal,
-      largeImageURL,
-    } = this.state;
-    return (
-      <div className="App">
-        <Searchbar handleSubmit={this.handleSubmit} />
+      {!imageQuery && <h2>Try to find something!</h2>}
 
-        {!imageQuery && <h2>Try to find something!</h2>}
-
-        {loading && (
-          <ThreeCircles
-            height="100"
-            width="100"
-            color="#4fa94d"
-            wrapperStyle={{}}
-            wrapperClass=""
-            visible={true}
-            ariaLabel="three-circles-rotating"
-            outerCircleColor=""
-            innerCircleColor=""
-            middleCircleColor=""
-          />
-        )}
-
-        <ImageGallery
-          items={images}
-          loading={loading}
-          handleClick={this.handleClick}
+      {loading && (
+        <ThreeCircles
+          height="100"
+          width="100"
+          color="#4fa94d"
+          wrapperStyle={{}}
+          wrapperClass=""
+          visible={true}
+          ariaLabel="three-circles-rotating"
+          outerCircleColor=""
+          innerCircleColor=""
+          middleCircleColor=""
         />
+      )}
 
-        {images.length > 0 && loadMore && (
-          <Button handleClick={this.handleLoadMore} />
-        )}
+      <ImageGallery
+        items={images}
+        loading={loading}
+        handleClick={handleClick}
+      />
 
-        {isShowModal && (
-          <Modal
-            largeImageURL={largeImageURL}
-            onClose={this.handleModalClose}
-          />
-        )}
-      </div>
-    );
-  }
-}
+      {images.length > 0 && loadMore && <Button handleClick={handleLoadMore} />}
+
+      {isShowModal && (
+        <Modal largeImageURL={largeImageURL} onClose={handleModalClose} />
+      )}
+    </div>
+  );
+};
